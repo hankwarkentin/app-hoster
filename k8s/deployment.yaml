@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apphoster
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apphoster
+  template:
+    metadata:
+      labels:
+        app: apphoster
+    spec:
+      containers:
+      - name: apphoster
+        image: apphoster:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+        env:
+        - name: PORT
+          value: "3000"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: apphoster-secrets
+              key: DATABASE_URL
+        - name: aws_access_key_id
+          valueFrom:
+            secretKeyRef:
+              name: apphoster-secrets
+              key: aws_access_key_id
+        - name: aws_secret_access_key
+          valueFrom:
+            secretKeyRef:
+              name: apphoster-secrets
+              key: aws_secret_access_key
+        - name: aws_s3_bucket
+          valueFrom:
+            secretKeyRef:
+              name: apphoster-secrets
+              key: aws_s3_bucket
