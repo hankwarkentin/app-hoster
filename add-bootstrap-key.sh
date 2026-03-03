@@ -9,7 +9,14 @@ if [ -z "$KEY" ] || [ -z "$NAME" ]; then
   exit 1
 fi
 POD=$(kubectl get pods -l app=postgres -o jsonpath='{.items[0].metadata.name}')
-# Compute SHA-256 hash of the key
-HASH=$(echo -n "$KEY" | shasum -a 256 | awk '{print $1}')
-kubectl exec "$POD" -- bash -c "PGPASSWORD=password psql -U postgres -d apphoster -c \"INSERT INTO customers (name, email, api_key_hash, role) VALUES ('$NAME', '$NAME@example.com', '$HASH', 'admin');\""
-echo "Bootstrap API key '$KEY' for customer '$NAME' added."
+# Insert superadmin customer and API key
+SQL="DO \$\$ 
+DECLARE
+  cid INTEGER;
+BEGIN
+  INSERT INTO customers (name, email, role) VALUES ('$NAME', '$NAME@example.com', 'superadmin');
+  SELECT id INTO cid FROM customers WHERE name = '$NAME';
+  INSERT INTO api_keys (customer_id, key_hash, revoked) VALUES (cid, '$KEY', FALSE);
+END\$\$ LANGUAGE plpgsql;"
+echo "$SQL" | kubectl exec -i "$POD" -- bash -c "PGPASSWORD=password psql -U postgres -d apphoster"
+echo "Superadmin user '$NAME' and API key '$KEY' added for testing."

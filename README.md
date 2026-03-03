@@ -28,6 +28,38 @@ A Node.js + TypeScript API for hosting and distributing IPA, AAB, and APK files 
 - All /api endpoints require an API key in the `x-api-key` header
 - The bootstrap key is set during deployment (see deploy-minikube.sh)
 
+## API Key Management Endpoints
+
+All API key management endpoints require an admin API key in the `x-api-key` header.
+
+- `GET /api/keys` — List all API keys
+- `POST /api/keys` — Create a new API key (body: `{ name, email, role }`)
+- `GET /api/keys/:id` — Get metadata for a specific key
+- `POST /api/keys/:id/revoke` — Revoke an API key
+
+### Example Usage
+```bash
+# List API keys
+curl -H "x-api-key: <admin-key>" http://localhost:8000/api/keys
+
+# Create a new API key
+curl -X POST -H "x-api-key: <admin-key>" -H "Content-Type: application/json" \
+  -d '{"name":"user","email":"user@example.com","role":"user"}' \
+  http://localhost:8000/api/keys
+
+# Get metadata for a key
+curl -H "x-api-key: <admin-key>" http://localhost:8000/api/keys/2
+
+# Revoke a key
+curl -X POST -H "x-api-key: <admin-key>" http://localhost:8000/api/keys/2/revoke
+```
+
+### Error Handling
+- 401: Missing API key
+- 403: Invalid or revoked API key
+- 404: Key or app not found
+- 400: Invalid request format
+
 ## Endpoints
 - `POST /api/apps/upload` (multipart/form-data, file upload)
 - `GET /api/apps` (list apps)

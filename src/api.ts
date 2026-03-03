@@ -7,6 +7,8 @@ import path from 'path';
 // TODO: S3 integration will be added later
 import { saveLocalFile, getLocalFilePath } from './localStorage.js';
 import pool from './db.js';
+import apikeysRouter from './apikeys.js';
+import logger from './logger.js';
 
 // Router initialization
 const router = express.Router();
@@ -25,7 +27,7 @@ router.post('/apps/upload', upload.single('file'), async (req, res) => {
     if (!file || !file.originalname) return res.status(400).json({ error: 'No file uploaded' });
     if (file.originalname.length > 255) return res.status(400).json({ error: 'Filename too long' });
     // Save locally for dev
-    const localPath = saveLocalFile(file);
+    saveLocalFile(file);
     // Store metadata in DB
     const result = await pool.query(
       'INSERT INTO apps (filename, customer_id, uploaded_at) VALUES ($1, $2, NOW()) RETURNING *',
@@ -33,11 +35,13 @@ router.post('/apps/upload', upload.single('file'), async (req, res) => {
     );
     res.json({ success: true, app: result.rows[0] });
   } catch (err) {
-    console.error('Upload error:', err);
+    logger.error({ err }, 'Upload error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
+// Mount API key router
+router.use('/keys', apikeysRouter);
 // GET /api/apps - List uploaded apps
 router.get('/apps', async (req, res) => {
   try {
@@ -48,7 +52,7 @@ router.get('/apps', async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error('List apps error:', err);
+    logger.error({ err }, 'List apps error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -65,12 +69,12 @@ router.get('/apps/:id/download', async (req, res) => {
     const filePath = getLocalFilePath(app.filename);
     res.download(filePath, app.filename, err => {
       if (err) {
-        console.error('Download error:', err);
+        logger.error({ err }, 'Download error');
         res.status(500).json({ error: 'File download failed' });
       }
     });
   } catch (err) {
-    console.error('Download error:', err);
+    logger.error({ err }, 'Download error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -82,10 +86,10 @@ router.delete('/apps/:id', async (req, res) => {
     const appId = Number(req.params.id);
     if (!Number.isInteger(appId) || appId <= 0) return res.status(400).json({ error: 'Invalid app ID' });
     const result = await pool.query('DELETE FROM apps WHERE id = $1 AND customer_id = $2 RETURNING *', [appId, req.customer.id]);
-    if (result.rowCount === 0) return res.status(404).json({ error: 'App not found or not owned by user' });
+    if (result.rowCount === 0) return res.status(404).json({ error: 'App not found' });
     res.json({ success: true });
   } catch (err) {
-    console.error('Delete error:', err);
+    logger.error({ err }, 'Delete error');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
