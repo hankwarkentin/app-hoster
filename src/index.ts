@@ -15,6 +15,12 @@ console.log(`AppHoster v${APP_VERSION} started`);
 const app = express();
 app.use(express.json());
 
+
+// Public health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: Date.now() });
+});
+
 app.get('/', (req, res) => {
   console.log(`Root endpoint hit (v${APP_VERSION})`);
   res.send('AppHoster API is running');

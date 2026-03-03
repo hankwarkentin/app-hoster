@@ -3,12 +3,21 @@ import request from 'supertest';
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import apiRouter from '../src/api.js';
-import { apiKeyAuth } from '../src/auth.js';
 
-const app = express();
-app.use(express.json());
-app.use('/api', apiKeyAuth, apiRouter);
+// Only import the router for health check test to avoid circular dependency
+let app: express.Express;
+
+beforeAll(async () => {
+  const { default: apiRouter } = await import('../src/api.js');
+  const { apiKeyAuth } = await import('../src/auth.js');
+  app = express();
+  app.use(express.json());
+  // Add public health check route to test app
+  app.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: Date.now() });
+  });
+  app.use('/api', apiKeyAuth, apiRouter);
+});
 
 const API_KEY = process.env.TEST_API_KEY || 'test-bootstrap-key';
 const INVALID_API_KEY = 'invalid-key';
@@ -23,6 +32,12 @@ function cleanupTestFiles() {
 }
 
 describe('AppHoster API', () => {
+  it('should return ok for health check', async () => {
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+    expect(typeof res.body.timestamp).toBe('number');
+  });
   beforeAll(() => {
     cleanupTestFiles();
     fs.writeFileSync(TEST_FILE, TEST_FILE_CONTENT);

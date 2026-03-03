@@ -1,3 +1,6 @@
+
+
+// All imports at the top
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
@@ -5,8 +8,14 @@ import path from 'path';
 import { saveLocalFile, getLocalFilePath } from './localStorage.js';
 import pool from './db.js';
 
+// Router initialization
 const router = express.Router();
 const upload = multer({ dest: path.join(new URL('.', import.meta.url).pathname, '../uploads') });
+
+// Health check endpoint
+router.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: Date.now() });
+});
 
 // POST /api/apps/upload - Upload app file
 router.post('/apps/upload', upload.single('file'), async (req, res) => {
@@ -81,4 +90,5 @@ router.delete('/apps/:id', async (req, res) => {
   }
 });
 
+// Export router after all endpoints are defined
 export default router;
