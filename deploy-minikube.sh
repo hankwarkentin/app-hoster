@@ -26,9 +26,6 @@ DOCKER_IMAGE=apphoster:latest
 echo "Building Docker image in Minikube's Docker..."
 docker build -t $DOCKER_IMAGE .
 
-# Load image into Minikube
-echo "Loading image into Minikube..."
-minikube image load $DOCKER_IMAGE
 
 # Deploy Postgres PVC, Secret, and Deployment
 kubectl apply -f k8s/postgres-pvc.yaml
@@ -55,7 +52,8 @@ fi
 # Delete existing deployment to force new image usage
 kubectl delete deployment apphoster --ignore-not-found
 
-# Apply apphoster manifests
+
+# Substitute version in deployment.yaml and apply manifests
 for manifest in k8s/secret.yaml k8s/deployment.yaml k8s/service.yaml; do
   echo "Applying $manifest..."
   kubectl apply -f $manifest
