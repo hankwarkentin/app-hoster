@@ -7,10 +7,11 @@ import apiRouter from './api.js';
 import { createCustomer } from './customer.js';
 import crypto from 'crypto';
 import logger from './logger.js';
+import pkg from '../package.json' with { type: 'json' };
 
 dotenv.config();
 
-const APP_VERSION = '1.0.1';
+const APP_VERSION = pkg.version;
 dotenv.config();
 logger.info({ event: 'startup', version: APP_VERSION }, 'AppHoster started');
 
@@ -26,7 +27,7 @@ app.get('/health', (req, res) => {
 
 app.get('/', (req, res) => {
   logger.info({ event: 'root', version: APP_VERSION }, 'Root endpoint hit');
-  res.send('AppHoster API is running');
+  res.send(`AppHoster API version ${APP_VERSION} is running`);
 });
 
 
