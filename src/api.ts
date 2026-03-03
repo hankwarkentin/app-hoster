@@ -10,55 +10,75 @@ const upload = multer({ dest: path.join(new URL('.', import.meta.url).pathname, 
 
 // POST /api/apps/upload - Upload app file
 router.post('/apps/upload', upload.single('file'), async (req, res) => {
-  const file = req.file;
-  if (!file) return res.status(400).json({ error: 'No file uploaded' });
-
-  // Save locally for dev
-  const localPath = saveLocalFile(file);
-
-  // Upload to S3 (placeholder)
-  // await s3.upload({
-  //   Bucket: bucketName,
-  //   Key: file.originalname,
-  //   Body: fs.createReadStream(localPath)
-  // }).promise();
-
-  // Store metadata in DB
-  if (!req.customer) return res.status(401).json({ error: 'Unauthorized' });
-  const result = await pool.query(
-    'INSERT INTO apps (filename, customer_id, uploaded_at) VALUES ($1, $2, NOW()) RETURNING *',
-    [file.originalname, req.customer.id]
-  );
-  res.json({ success: true, app: result.rows[0] });
+  try {
+    if (!req.customer) return res.status(401).json({ error: 'Unauthorized' });
+    const file = req.file;
+    if (!file || !file.originalname) return res.status(400).json({ error: 'No file uploaded' });
+    if (file.originalname.length > 255) return res.status(400).json({ error: 'Filename too long' });
+    // Save locally for dev
+    const localPath = saveLocalFile(file);
+    // Store metadata in DB
+    const result = await pool.query(
+      'INSERT INTO apps (filename, customer_id, uploaded_at) VALUES ($1, $2, NOW()) RETURNING *',
+      [file.originalname, req.customer.id]
+    );
+    res.json({ success: true, app: result.rows[0] });
+  } catch (err) {
+    console.error('Upload error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // GET /api/apps - List uploaded apps
 router.get('/apps', async (req, res) => {
-  if (!req.customer) return res.status(401).json({ error: 'Unauthorized' });
-  const result = await pool.query(
-    'SELECT * FROM apps WHERE customer_id = $1',
-    [req.customer.id]
-  );
-  res.json(result.rows);
+  try {
+    if (!req.customer) return res.status(401).json({ error: 'Unauthorized' });
+    const result = await pool.query(
+      'SELECT * FROM apps WHERE customer_id = $1',
+      [req.customer.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('List apps error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // GET /api/apps/:id/download - Download app file
 router.get('/apps/:id/download', async (req, res) => {
-  if (!req.customer) return res.status(401).json({ error: 'Unauthorized' });
-  const appId = req.params.id;
-  const result = await pool.query('SELECT * FROM apps WHERE id = $1 AND customer_id = $2', [appId, req.customer.id]);
-  const app = result.rows[0];
-  if (!app) return res.status(404).json({ error: 'App not found' });
-  const filePath = getLocalFilePath(app.filename);
-  res.download(filePath);
+  try {
+    if (!req.customer) return res.status(401).json({ error: 'Unauthorized' });
+    const appId = Number(req.params.id);
+    if (!Number.isInteger(appId) || appId <= 0) return res.status(400).json({ error: 'Invalid app ID' });
+    const result = await pool.query('SELECT * FROM apps WHERE id = $1 AND customer_id = $2', [appId, req.customer.id]);
+    const app = result.rows[0];
+    if (!app) return res.status(404).json({ error: 'App not found' });
+    const filePath = getLocalFilePath(app.filename);
+    res.download(filePath, app.filename, err => {
+      if (err) {
+        console.error('Download error:', err);
+        res.status(500).json({ error: 'File download failed' });
+      }
+    });
+  } catch (err) {
+    console.error('Download error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // DELETE /api/apps/:id - Remove app
 router.delete('/apps/:id', async (req, res) => {
-  if (!req.customer) return res.status(401).json({ error: 'Unauthorized' });
-  const appId = req.params.id;
-  await pool.query('DELETE FROM apps WHERE id = $1 AND customer_id = $2', [appId, req.customer.id]);
-  res.json({ success: true });
+  try {
+    if (!req.customer) return res.status(401).json({ error: 'Unauthorized' });
+    const appId = Number(req.params.id);
+    if (!Number.isInteger(appId) || appId <= 0) return res.status(400).json({ error: 'Invalid app ID' });
+    const result = await pool.query('DELETE FROM apps WHERE id = $1 AND customer_id = $2 RETURNING *', [appId, req.customer.id]);
+    if (result.rowCount === 0) return res.status(404).json({ error: 'App not found or not owned by user' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 export default router;
