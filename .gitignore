@@ -1,0 +1,43 @@
+# Node.js
+node_modules/
+dist/
+coverage/
+
+# Environment
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Uploads and test files
+uploads/
+test-download.txt
+dummy-app.txt
+
+# Minikube/K8s
+*.log
+*.pid
+*.swp
+*.tmp
+*.bak
+
+# Database
+*.sqlite
+*.db
+*.dump
+
+# Docker
+*.tar
+
+# Misc
+*.local
+*.secret
+
+# Ignore Downloads folder
+Downloads/
