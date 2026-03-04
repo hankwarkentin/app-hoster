@@ -27,8 +27,7 @@ CREATE TABLE IF NOT EXISTS app_versions (
   platform platform_type NOT NULL,
   version_name VARCHAR(64) NOT NULL,
   version_code VARCHAR(64),
-  branch VARCHAR(128),
-  commit VARCHAR(64),
+  metadata JSONB,
   folder VARCHAR(128),
   file_url VARCHAR(512) NOT NULL,
   uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

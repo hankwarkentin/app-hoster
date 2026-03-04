@@ -95,8 +95,7 @@ let versionId: string | undefined;
       .field('platform', 'ios')
       .field('version_name', '1.0.0')
       .field('version_code', '100')
-      .field('branch', 'main')
-      .field('commit', 'abcdef123456')
+      .field('metadata', JSON.stringify({ branch: 'main', commit: 'abcdef123456' }))
       .field('folder', 'main')
       .attach('file', TEST_FILE);
     expect(res.status).toBe(200);

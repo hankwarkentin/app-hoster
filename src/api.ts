@@ -54,7 +54,7 @@ router.post('/apps/upload', uploadWithFilter.single('file'), async (req, res) =>
     // Defensive: check for file and body before destructuring
     if (!file || !file.originalname) return res.status(400).json({ error: 'No file uploaded' });
     if (!req.body) return res.status(400).json({ error: 'Missing app or version metadata' });
-    const { name, bundle_id, platform, version_name, version_code, branch, commit, folder } = req.body;
+    const { name, bundle_id, platform, version_name, version_code, folder, metadata } = req.body;
     if (!name || !bundle_id || !platform || !version_name) return res.status(400).json({ error: 'Missing app or version metadata' });
     if (file.originalname.length > 255) return res.status(400).json({ error: 'Filename too long (max 255 characters)'});
     // Save locally for dev
@@ -74,10 +74,19 @@ router.post('/apps/upload', uploadWithFilter.single('file'), async (req, res) =>
     } else {
       appId = appResult.rows[0].id;
     }
+    // Parse metadata if provided as string
+    let metadataObj = null;
+    if (metadata) {
+      try {
+        metadataObj = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
+      } catch {
+        return res.status(400).json({ error: 'Invalid metadata JSON' });
+      }
+    }
     // Insert version
     const versionResult = await pool.query(
-      'INSERT INTO app_versions (app_id, platform, version_name, version_code, branch, commit, folder, file_url) VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-      [appId, platform, version_name, version_code || null, branch || null, commit || null, folder || null, localPath]
+      'INSERT INTO app_versions (app_id, platform, version_name, version_code, folder, file_url, metadata) VALUES ($1::uuid, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [appId, platform, version_name, version_code || null, folder || null, localPath, metadataObj]
     );
     res.json({ success: true, app: { id: appId, name, bundle_id }, version: versionResult.rows[0] });
   } catch (err) {
