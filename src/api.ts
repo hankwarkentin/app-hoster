@@ -5,7 +5,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 // TODO: S3 integration will be added later
-import { saveLocalFile, getLocalFilePath } from './localStorage.js';
+import { uploadFileToS3, getFileFromS3 } from './s3.js';
 import pool from './db.js';
 import apikeysRouter from './apikeys.js';
 import logger from './logger.js';
@@ -57,8 +57,9 @@ router.post('/apps/upload', uploadWithFilter.single('file'), async (req, res) =>
     const { name, bundle_id, platform, version_name, version_code, folder, metadata } = req.body;
     if (!name || !bundle_id || !platform || !version_name) return res.status(400).json({ error: 'Missing app or version metadata' });
     if (file.originalname.length > 255) return res.status(400).json({ error: 'Filename too long (max 255 characters)'});
-    // Save locally for dev
-    const localPath = saveLocalFile(file);
+    // Upload to S3
+    const s3Key = file.originalname;
+    await uploadFileToS3(s3Key, file.path);
     // Find or create app
     let appResult = await pool.query(
       'SELECT * FROM apps WHERE customer_id = $1::uuid AND name = $2 AND bundle_id = $3',
@@ -86,7 +87,7 @@ router.post('/apps/upload', uploadWithFilter.single('file'), async (req, res) =>
     // Insert version
     const versionResult = await pool.query(
       'INSERT INTO app_versions (app_id, platform, version_name, version_code, folder, file_url, metadata) VALUES ($1::uuid, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [appId, platform, version_name, version_code || null, folder || null, localPath, metadataObj]
+      [appId, platform, version_name, version_code || null, folder || null, s3Key, metadataObj]
     );
     res.json({ success: true, app: { id: appId, name, bundle_id }, version: versionResult.rows[0] });
   } catch (err) {
@@ -135,15 +136,23 @@ router.get('/apps/:id/download', async (req, res) => {
     );
     const version = result.rows[0];
     if (!version) return res.status(404).json({ error: 'App version not found' });
-    // Only use the filename for download, not the full path
-    const filename = path.basename(version.file_url);
-    const filePath = getLocalFilePath(filename);
-    res.download(filePath, filename, err => {
-      if (err) {
-        logger.error({ err }, 'Download error');
-        res.status(500).json({ error: 'File download failed' });
+    const s3Key = version.file_url;
+    try {
+      const s3Obj = await getFileFromS3(s3Key);
+      res.setHeader('Content-Disposition', `attachment; filename="${s3Key}"`);
+      if (s3Obj.Body && typeof (s3Obj.Body as any).pipe === 'function') {
+        (s3Obj.Body as any).pipe(res);
+      } else if (s3Obj.Body && Buffer.isBuffer(s3Obj.Body)) {
+        res.end(s3Obj.Body);
+      } else if (s3Obj.Body && typeof s3Obj.Body === 'string') {
+        res.end(s3Obj.Body);
+      } else {
+        res.status(404).json({ error: 'File not found in S3' });
       }
-    });
+    } catch (err) {
+      logger.error({ err }, 'Download error');
+      res.status(500).json({ error: 'File download failed' });
+    }
   } catch (err) {
     logger.error({ err }, 'Download error');
     res.status(500).json({ error: 'Internal server error' });

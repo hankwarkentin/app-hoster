@@ -1,13 +1,31 @@
-// TODO: Implement S3 integration for file storage
-// import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-// import dotenv from 'dotenv';
-// dotenv.config();
-// const s3 = new S3Client({
-//   region: process.env.aws_region || 'us-east-1',
-//   credentials: {
-//     accessKeyId: process.env.aws_access_key_id || 'PLACEHOLDER_KEY',
-//     secretAccessKey: process.env.aws_secret_access_key || 'PLACEHOLDER_SECRET',
-//   },
-// });
-// const bucketName = process.env.aws_s3_bucket || 'PLACEHOLDER_BUCKET';
-// export { s3, bucketName, PutObjectCommand, GetObjectCommand };
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import fs from 'fs';
+
+const s3 = new S3Client({
+	region: 'us-east-1',
+	endpoint: 'http://localhost:4566',
+	credentials: {
+		accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'test',
+		secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || 'test',
+	},
+	forcePathStyle: true,
+});
+const bucketName = process.env.S3_BUCKET || 'app-bucket';
+
+export async function uploadFileToS3(key: string, filePath: string) {
+	const fileStream = fs.createReadStream(filePath);
+	const command = new PutObjectCommand({
+		Bucket: bucketName,
+		Key: key,
+		Body: fileStream,
+	});
+	await s3.send(command);
+}
+
+export async function getFileFromS3(key: string) {
+	const command = new GetObjectCommand({
+		Bucket: bucketName,
+		Key: key,
+	});
+	return s3.send(command);
+}

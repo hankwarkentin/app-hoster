@@ -15,7 +15,7 @@ export interface AppVersion {
   version_name: string;
   version_code?: string;
   folder?: string;
-  file_url: string;
+  file_url: string; // S3 key
   uploaded_at: string;
   metadata?: Record<string, any>;
 }
