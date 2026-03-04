@@ -9,7 +9,7 @@ const API_KEY = process.env.TEST_API_KEY || 'test-bootstrap-key';
 
 beforeAll(async () => {
   // Clean up tables before tests
-  await pool.query('TRUNCATE api_keys, customers RESTART IDENTITY CASCADE');
+  await pool.query('TRUNCATE api_keys, customers CASCADE');
   // Ensure bootstrap customer exists
   const email = 'bootstrap@example.com';
   const name = 'bootstrap';
@@ -28,7 +28,7 @@ beforeAll(async () => {
   // Ensure bootstrap API key exists in api_keys table
   const keyHash = hashSync(API_KEY, 10);
   await pool.query(
-    'INSERT INTO api_keys (customer_id, key_hash) VALUES ($1, $2)',
+    'INSERT INTO api_keys (customer_id, key_hash) VALUES ($1::uuid, $2)',
     [customerId, keyHash]
   );
 });

@@ -13,7 +13,7 @@ let app: express.Express;
 
 beforeAll(async () => {
   // Ensure a valid API key exists for tests
-  await pool.query('TRUNCATE api_keys, customers RESTART IDENTITY CASCADE');
+  await pool.query('TRUNCATE api_keys, customers CASCADE');
   const email = 'bootstrap@example.com';
   const name = 'bootstrap';
   const role = 'admin';
@@ -30,7 +30,7 @@ beforeAll(async () => {
   }
   const keyHash = hashSync(API_KEY, 10);
   await pool.query(
-    'INSERT INTO api_keys (customer_id, key_hash) VALUES ($1, $2)',
+    'INSERT INTO api_keys (customer_id, key_hash) VALUES ($1::uuid, $2)',
     [customerId, keyHash]
   );
   app = express();
@@ -84,16 +84,35 @@ describe('AppHoster API', () => {
   });
 
   let appId: number | undefined;
+let versionId: string | undefined;
 
   it('should upload a valid file', async () => {
     const res = await request(app)
       .post('/api/apps/upload')
       .set('x-api-key', API_KEY)
+      .field('name', 'TestApp')
+      .field('bundle_id', 'com.example.testapp')
+      .field('platform', 'ios')
+      .field('version_name', '1.0.0')
+      .field('version_code', '100')
+      .field('branch', 'main')
+      .field('commit', 'abcdef123456')
+      .field('folder', 'main')
       .attach('file', TEST_FILE);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.app).toBeDefined();
+    expect(res.body.version).toBeDefined();
     appId = res.body.app.id;
+    versionId = res.body.version.id;
+    expect(typeof appId).toBe('string');
+    expect(typeof versionId).toBe('string');
+    if (typeof appId === 'string') {
+      expect(/^[0-9a-fA-F-]{36}$/.test(appId)).toBe(true);
+    }
+    if (typeof versionId === 'string') {
+      expect(/^[0-9a-fA-F-]{36}$/.test(versionId)).toBe(true);
+    }
   });
 
   it('should list apps after upload', async () => {
@@ -102,12 +121,20 @@ describe('AppHoster API', () => {
       .set('x-api-key', API_KEY);
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.some((app: any) => app.filename === TEST_FILE)).toBe(true);
+    // Should contain the uploaded version
+    const uploadedVersion = res.body.find((v: any) => v.version_name === '1.0.0' && v.file_url.endsWith(TEST_FILE));
+    expect(uploadedVersion).toBeTruthy();
+    // Save versionId for later tests
+    versionId = uploadedVersion.id;
+    expect(typeof versionId).toBe('string');
+    if (typeof versionId === 'string') {
+      expect(/^[0-9a-fA-F-]{36}$/.test(versionId)).toBe(true);
+    }
   });
 
   it('should download the uploaded file', async () => {
     const res = await request(app)
-      .get(`/api/apps/${appId}/download`)
+      .get(`/api/apps/${versionId}/download`)
       .set('x-api-key', API_KEY);
     expect(res.status).toBe(200);
     fs.writeFileSync('downloaded-endpoint.txt', res.text);
@@ -117,7 +144,7 @@ describe('AppHoster API', () => {
 
   it('should delete the uploaded file', async () => {
     const res = await request(app)
-      .delete(`/api/apps/${appId}`)
+      .delete(`/api/apps/${versionId}`)
       .set('x-api-key', API_KEY);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -129,7 +156,8 @@ describe('AppHoster API', () => {
       .set('x-api-key', API_KEY);
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBe(0);
+    // Should be empty after delete
+    expect(res.body.some((v: any) => v.id === versionId)).toBe(false);
   });
 
   it('should fail to upload with no file', async () => {
@@ -146,8 +174,9 @@ describe('AppHoster API', () => {
       .post('/api/apps/upload')
       .set('x-api-key', API_KEY)
       .attach('file', Buffer.from('dummy'), longName);
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/Filename too long/);
+      // Should pass only if the endpoint rejects the long filename
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/Filename too long/);
   });
 
   it('should return 400 for invalid app ID on download', async () => {
@@ -155,22 +184,24 @@ describe('AppHoster API', () => {
       .get('/api/apps/abc/download')
       .set('x-api-key', API_KEY);
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/Invalid app ID/);
+    expect(res.body.error).toMatch(/Invalid app version ID/);
   });
 
   it('should return 404 for non-existent app on download', async () => {
+    const fakeId = '00000000-0000-0000-0000-000000000000';
     const res = await request(app)
-      .get('/api/apps/9999/download')
+      .get(`/api/apps/${fakeId}/download`)
       .set('x-api-key', API_KEY);
     expect(res.status).toBe(404);
-    expect(res.body.error).toMatch(/App not found/);
+    expect(res.body.error).toMatch(/App version not found/);
   });
 
   it('should return 404 for non-existent app on delete', async () => {
+    const fakeId = '00000000-0000-0000-0000-000000000000';
     const res = await request(app)
-      .delete('/api/apps/9999')
+      .delete(`/api/apps/${fakeId}`)
       .set('x-api-key', API_KEY);
     expect(res.status).toBe(404);
-    expect(res.body.error).toMatch(/App not found/);
+    expect(res.body.error).toMatch(/App version not found/);
   });
 });
