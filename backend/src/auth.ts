@@ -11,18 +11,24 @@ export function apiKeyAuth(req: Request, res: Response, next: NextFunction) {
       logger.error({ event: 'auth', apiKey }, 'No API key provided');
       return res.status(401).json({ error: 'API key required' });
     }
-    // Find all non-revoked keys
-    const keyResult = await pool.query('SELECT customer_id, key_hash, revoked FROM api_keys WHERE revoked = FALSE');
+    // Find all keys (including revoked)
+    const keyResult = await pool.query('SELECT customer_id, key_hash, revoked FROM api_keys');
     let customerId: string | undefined;
+    let isRevoked = false;
     for (const row of keyResult.rows) {
       if (compareSync(apiKey, row.key_hash)) {
         customerId = row.customer_id;
+        isRevoked = row.revoked;
         break;
       }
     }
     if (!customerId) {
       logger.error({ event: 'auth', apiKey }, 'Invalid API key');
       return res.status(403).json({ error: 'Invalid API key' });
+    }
+    if (isRevoked) {
+      logger.error({ event: 'auth', apiKey }, 'Revoked API key');
+      return res.status(403).json({ error: 'API key revoked' });
     }
     const custResult = await pool.query('SELECT * FROM customers WHERE id = $1::uuid', [customerId]);
     if (custResult.rowCount === 0) {

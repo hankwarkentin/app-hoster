@@ -22,15 +22,12 @@ else
 fi
 
 # Build Docker image in Minikube's Docker
-BACKEND_IMAGE=apphoster-backend:latest
+DOCKER_IMAGE=apphoster:latest
 FRONTEND_IMAGE=apphoster-frontend:latest
 echo "Building backend Docker image in Minikube's Docker..."
-docker build -t $BACKEND_IMAGE ./backend
-
-
+docker build -t $DOCKER_IMAGE .
 echo "Building frontend Docker image in Minikube's Docker..."
-docker build -t $FRONTEND_IMAGE ./frontend
-
+docker build -t $FRONTEND_IMAGE ../frontend
 
 
 # Deploy Postgres PVC, Secret, and Deployment
@@ -56,14 +53,11 @@ if [[ "$1" == "--reset" ]]; then
 fi
 
 # Delete existing deployment to force new image usage
-
-# Delete existing backend and frontend deployments to force new image usage
-kubectl delete deployment apphoster-backend --ignore-not-found
-kubectl delete deployment apphoster-frontend --ignore-not-found
+kubectl delete deployment apphoster --ignore-not-found
 
 
 # Substitute version in deployment.yaml and apply manifests
-for manifest in k8s/backend-secret.yaml k8s/backend-deployment.yaml k8s/backend-service.yaml k8s/frontend-deployment.yaml; do
+for manifest in k8s/secret.yaml k8s/deployment.yaml k8s/service.yaml k8s/frontend-deployment.yaml; do
   echo "Applying $manifest..."
   kubectl apply -f $manifest
   sleep 1
@@ -72,7 +66,7 @@ done
 # Expose service and set up port-forwarding for API access
 
 # API port-forward
-SERVICE_NAME=apphoster-backend-service
+SERVICE_NAME=apphoster-service
 PORT_FORWARD_LOCAL=8000
 PORT_FORWARD_REMOTE=3000
 if lsof -Pi :$PORT_FORWARD_LOCAL -sTCP:LISTEN -t >/dev/null; then

@@ -11,7 +11,7 @@ beforeAll(async () => {
   // Clean up tables before tests
   await pool.query('TRUNCATE api_keys, customers CASCADE');
   // Ensure bootstrap customer exists
-  const email = 'bootstrap@example.com';
+  const email = `bootstrap+${Date.now()}@example.com`;
   const name = 'bootstrap';
   const role = 'admin';
   let result = await pool.query('SELECT * FROM customers WHERE email = $1', [email]);
@@ -44,8 +44,10 @@ describe('API Key Endpoints', () => {
       .expect(200);
     expect(res.body.key).toBeDefined();
     expect(res.body.id).toBeDefined();
-    createdKeyId = res.body.id;
+    // Ensure createdKeyId is a string (UUID)
+    createdKeyId = String(res.body.id);
     createdKeyValue = res.body.key;
+    console.log('createdKeyId:', createdKeyId, 'type:', typeof createdKeyId);
   });
 
   it('should list API keys', async () => {
@@ -54,7 +56,16 @@ describe('API Key Endpoints', () => {
       .set('x-api-key', API_KEY)
       .expect(200);
     expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.some((k: any) => k.id === createdKeyId)).toBe(true);
+    console.log('createdKeyId:', createdKeyId);
+    console.log('Returned ids:', res.body.map((k: any) => k.id));
+    console.log('Full response:', JSON.stringify(res.body, null, 2));
+    if (!res.body.some((k: any) => String(k.id) === String(createdKeyId))) {
+      console.error('createdKeyId not found!');
+      console.error('createdKeyId:', createdKeyId);
+      console.error('Returned ids:', res.body.map((k: any) => k.id));
+      console.error('Full response:', JSON.stringify(res.body, null, 2));
+    }
+    expect(res.body.some((k: any) => String(k.id) === String(createdKeyId))).toBe(true);
   });
 
   it('should get metadata for a specific key', async () => {
@@ -89,16 +100,20 @@ describe('API Key Endpoints', () => {
   });
 
   it('should fail to get a non-existent key', async () => {
+    // Use a valid UUID that does not exist
+    const nonExistentUUID = '11111111-1111-1111-1111-111111111111';
     const res = await request(app)
-      .get('/api/keys/999999')
+      .get(`/api/keys/${nonExistentUUID}`)
       .set('x-api-key', API_KEY)
       .expect(404);
     expect(res.body.error).toMatch(/not found/i);
   });
 
   it('should fail to revoke a non-existent key', async () => {
+    // Use a valid UUID that does not exist
+    const nonExistentUUID = '11111111-1111-1111-1111-111111111111';
     const res = await request(app)
-      .delete('/api/keys/999999')
+      .delete(`/api/keys/${nonExistentUUID}`)
       .set('x-api-key', API_KEY)
       .expect(404);
     expect(res.body.error).toMatch(/not found/i);

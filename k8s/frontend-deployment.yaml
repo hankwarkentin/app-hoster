@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apphoster-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apphoster-frontend
+  template:
+    metadata:
+      labels:
+        app: apphoster-frontend
+    spec:
+      containers:
+      - name: apphoster-frontend
+        image: apphoster-frontend:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apphoster-frontend-service
+spec:
+  selector:
+    app: apphoster-frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: NodePort

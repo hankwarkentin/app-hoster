@@ -9,14 +9,14 @@ if [ -z "$KEY" ] || [ -z "$NAME" ]; then
   exit 1
 fi
 POD=$(kubectl get pods -l app=postgres -o jsonpath='{.items[0].metadata.name}')
-# Insert superadmin customer and API key
+# Insert superadmin customer and API key (UUID)
 SQL="DO \$\$ 
 DECLARE
-  cid INTEGER;
+  cid UUID;
 BEGIN
-  INSERT INTO customers (name, email, role) VALUES ('$NAME', '$NAME@example.com', 'superadmin');
+  INSERT INTO customers (name, email, role) VALUES ('$NAME', '$NAME@example.com', 'superadmin') ON CONFLICT (email) DO NOTHING;
   SELECT id INTO cid FROM customers WHERE name = '$NAME';
-  INSERT INTO api_keys (customer_id, key_hash, revoked) VALUES (cid, '$KEY', FALSE);
+  INSERT INTO api_keys (customer_id, key_hash, revoked) VALUES (cid, crypt('$KEY', gen_salt('bf')), FALSE);
 END\$\$ LANGUAGE plpgsql;"
-echo "$SQL" | kubectl exec -i "$POD" -- bash -c "PGPASSWORD=password psql -U postgres -d apphoster"
+echo "$SQL" | kubectl exec -i "$POD" -- bash -c "PGPASSWORD=postgres psql -U postgres -d apphoster"
 echo "Superadmin user '$NAME' and API key '$KEY' added for testing."

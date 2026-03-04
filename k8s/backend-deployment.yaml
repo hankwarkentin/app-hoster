@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: apphoster
+  name: apphoster-backend
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: apphoster
+      app: apphoster-backend
   template:
     metadata:
       labels:
-        app: apphoster
+        app: apphoster-backend
     spec:
       containers:
-      - name: apphoster
-        image: apphoster:latest
+      - name: apphoster-backend
+        image: apphoster-backend:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3000

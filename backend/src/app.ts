@@ -1,4 +1,5 @@
 import express from 'express';
+import type { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import pool from './db.js';
 import { apiKeyAuth } from './auth.js';
@@ -14,19 +15,21 @@ dotenv.config();
 logger.info({ event: 'startup', version: APP_VERSION }, 'AppHoster started');
 
 const app = express();
+import cors from 'cors';
+app.use(cors());
 app.use(express.json());
 
 // Public health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: Date.now() });
 });
 
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response) => {
   logger.info({ event: 'root', version: APP_VERSION }, 'Root endpoint hit');
   res.send(`AppHoster API version ${APP_VERSION} is running`);
 });
 
-app.get('/db-test', async (req, res) => {
+app.get('/db-test', async (req: Request, res: Response) => {
   try {
     const result = await pool.query('SELECT NOW()');
     res.json({ time: result.rows[0] });
@@ -39,7 +42,7 @@ app.get('/db-test', async (req, res) => {
 
 app.use('/api', apiKeyAuth, apiRouter);
 
-app.post('/create-test-customer', async (req, res) => {
+app.post('/create-test-customer', async (req: Request, res: Response) => {
   const name = req.body.name || 'Test User';
   const email = req.body.email || `testuser${Date.now()}@example.com`;
   try {
