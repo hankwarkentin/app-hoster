@@ -34,7 +34,7 @@ beforeAll(async () => {
 });
 
 describe('API Key Endpoints', () => {
-  let createdKeyId: number;
+  let createdKeyId: string;
   let createdKeyValue: string;
 
   it('should create a new API key', async () => {
