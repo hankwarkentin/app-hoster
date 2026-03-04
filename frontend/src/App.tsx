@@ -1,71 +1,31 @@
-
 import { useEffect, useState } from 'react';
+import AppTable from './AppTable';
+import SignIn from './SignIn';
 import './App.css';
 
-interface AppVersion {
-  id: string;
-  name: string;
-  bundle_id: string;
-  platform: string;
-  version_name: string;
-  version_code?: string;
-  folder?: string;
-  uploaded_at: string;
-  metadata?: Record<string, any>;
-}
+const FRONTEND_VERSION = '1.0.0';
 
 function App() {
-  const [apps, setApps] = useState<AppVersion[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [backendVersion, setBackendVersion] = useState<string>('');
 
   useEffect(() => {
-    async function fetchApps() {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch('http://localhost:8000/api/apps', {
-          headers: { 'x-api-key': 'test-bootstrap-key' },
-        });
-        if (!res.ok) throw new Error('Failed to fetch apps');
-        const data = await res.json();
-        setApps(data);
-      } catch (err: any) {
-        setError(err.message || 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchApps();
+    fetch('/api/version')
+      .then(res => res.json())
+      .then(data => setBackendVersion(data.version || ''));
   }, []);
 
   return (
     <div className="App">
-      <h1>AppHoster - App Browser</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p style={{ color: 'red' }}>Error: {error}</p>}
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Bundle ID</th>
-            <th>Platform</th>
-            <th>Version</th>
-            <th>Uploaded</th>
-          </tr>
-        </thead>
-        <tbody>
-          {apps.map(app => (
-            <tr key={app.id}>
-              <td>{app.name}</td>
-              <td>{app.bundle_id}</td>
-              <td>{app.platform}</td>
-              <td>{app.version_name}</td>
-              <td>{new Date(app.uploaded_at).toLocaleString()}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <h1>AppHoster</h1>
+      {!token ? (
+        <SignIn onSignIn={setToken} />
+      ) : (
+        <AppTable token={token} />
+      )}
+      <div style={{ position: 'fixed', right: 12, bottom: 8, fontSize: 12, color: '#888' }}>
+        Frontend v{FRONTEND_VERSION} | Backend v{backendVersion}
+      </div>
     </div>
   );
 }

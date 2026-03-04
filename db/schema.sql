@@ -10,7 +10,6 @@ CREATE TABLE IF NOT EXISTS customers (
   last_used TIMESTAMP
 );
 
-
 CREATE TYPE platform_type AS ENUM ('ios', 'android');
 
 CREATE TABLE IF NOT EXISTS apps (
@@ -41,4 +40,16 @@ CREATE TABLE IF NOT EXISTS api_keys (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_used TIMESTAMP,
   revoked BOOLEAN DEFAULT FALSE
+);
+
+-- users table for user authentication
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id UUID REFERENCES customers(id) ON DELETE CASCADE,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  name VARCHAR(255),
+  role VARCHAR(32) NOT NULL DEFAULT 'user',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_login TIMESTAMP
 );

@@ -50,8 +50,8 @@ if [[ "$1" == "--reset" ]]; then
   kubectl exec "$POSTGRES_POD" -- bash -c "PGPASSWORD=postgres psql -U postgres -d apphoster -f /tmp/schema.sql"
   BOOTSTRAP_KEY="test-bootstrap-key"
   BOOTSTRAP_NAME="bootstrap"
-  echo "Adding bootstrap API key to database..."
-  ./add-bootstrap-key.sh "$BOOTSTRAP_KEY" "$BOOTSTRAP_NAME"
+  echo "Adding bootstrap API key and test user to database..."
+  ./bootstrap-setup.sh "$BOOTSTRAP_KEY" "$BOOTSTRAP_NAME"
 fi
 
 # Delete existing deployment to force new image usage

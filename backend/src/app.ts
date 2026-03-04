@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import pool from './db.js';
 import { apiKeyAuth } from './auth.js';
 import apiRouter from './api.js';
+import authLoginRouter from './auth-login.js';
 import { createCustomer } from './customer.js';
 import logger from './logger.js';
 import pkg from '../package.json' with { type: 'json' };
@@ -24,9 +25,15 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: Date.now() });
 });
 
+
 app.get('/', (req: Request, res: Response) => {
   logger.info({ event: 'root', version: APP_VERSION }, 'Root endpoint hit');
   res.send(`AppHoster API version ${APP_VERSION} is running`);
+});
+
+// Backend version endpoint
+app.get('/api/version', (req: Request, res: Response) => {
+  res.json({ version: APP_VERSION });
 });
 
 app.get('/db-test', async (req: Request, res: Response) => {
@@ -40,6 +47,9 @@ app.get('/db-test', async (req: Request, res: Response) => {
   }
 });
 
+
+// Public login endpoint (no API key required)
+app.use('/api', authLoginRouter);
 app.use('/api', apiKeyAuth, apiRouter);
 
 app.post('/create-test-customer', async (req: Request, res: Response) => {

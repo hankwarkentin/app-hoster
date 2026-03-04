@@ -3,7 +3,7 @@ FROM node:22-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
-COPY . .
+COPY . ./
 RUN rm -rf dist && npx tsc
 
 FROM node:22-alpine AS runtime
@@ -13,4 +13,4 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/.env ./
 RUN npm install --omit=dev
 EXPOSE 3000
-	CMD ["node", "dist/index.js"]
+CMD ["node", "dist/index.js"]
