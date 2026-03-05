@@ -2,7 +2,7 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import pool from './db.js';
-import { apiKeyAuth } from './auth.js';
+import { apiKeyOrJwtAuth } from './auth.js';
 import apiRouter from './api.js';
 import authLoginRouter from './auth-login.js';
 import { createCustomer } from './customer.js';
@@ -50,7 +50,7 @@ app.get('/db-test', async (req: Request, res: Response) => {
 
 // Public login endpoint (no API key required)
 app.use('/api', authLoginRouter);
-app.use('/api', apiKeyAuth, apiRouter);
+app.use('/api', apiKeyOrJwtAuth, apiRouter);
 
 app.post('/create-test-customer', async (req: Request, res: Response) => {
   const name = req.body.name || 'Test User';

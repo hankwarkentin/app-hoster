@@ -3,7 +3,8 @@ import AppTable from './AppTable';
 import SignIn from './SignIn';
 import './App.css';
 
-const FRONTEND_VERSION = '1.0.0';
+declare const __FRONTEND_VERSION__: string;
+const FRONTEND_VERSION = __FRONTEND_VERSION__;
 
 function App() {
   const [token, setToken] = useState<string | null>(null);
