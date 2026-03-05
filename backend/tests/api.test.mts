@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import pool from '../src/db.js';
 import { hashSync } from 'bcryptjs';
-import { apiKeyAuth } from '../src/auth.js';
+import { apiKeyOrJwtAuth } from '../src/auth.js';
 import apiRouter from '../src/api.js';
 
 // Only import the router for health check test to avoid circular dependency
@@ -39,7 +39,7 @@ beforeAll(async () => {
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: Date.now() });
   });
-  app.use('/api', apiKeyAuth, apiRouter);
+  app.use('/api', apiKeyOrJwtAuth, apiRouter);
 });
 
 const API_KEY = process.env.TEST_API_KEY || 'test-bootstrap-key';
@@ -72,7 +72,7 @@ describe('AppHoster API', () => {
   it('should return 401 for missing API key', async () => {
     const res = await request(app).get('/api/apps');
     expect(res.status).toBe(401);
-    expect(res.body.error).toMatch(/Unauthorized|API key required/);
+    expect(res.body.error).toMatch(/Unauthorized|API key required|API key or JWT required/);
   });
 
   it('should return 403 for invalid API key', async () => {

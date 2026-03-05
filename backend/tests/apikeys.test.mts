@@ -96,7 +96,7 @@ describe('API Key Endpoints', () => {
     const res = await request(app)
       .post('/api/keys')
       .expect(401);
-    expect(res.body.error).toMatch(/Unauthorized|API key required/);
+    expect(res.body.error).toMatch(/Unauthorized|API key required|API key or JWT required/);
   });
 
   it('should fail to get a non-existent key', async () => {
