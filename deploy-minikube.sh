@@ -20,17 +20,26 @@ else
   exit 1
 fi
 
+VERSION_BUMP_SCRIPT=""
+if [[ -n "$VERSION_BUMP" ]]; then
+  VERSION_BUMP_SCRIPT="$VERSION_BUMP"
+else
+  VERSION_BUMP_SCRIPT="patch"
+fi
+
+echo "Bumping backend package version..."
+npm --prefix ./backend version $VERSION_BUMP_SCRIPT --no-git-tag-version
+echo "Bumping frontend package version..."
+npm --prefix ./frontend version $VERSION_BUMP_SCRIPT --no-git-tag-version
+
 # Build Docker image in Minikube's Docker
 BACKEND_IMAGE=apphoster-backend:latest
 FRONTEND_IMAGE=apphoster-frontend:latest
 echo "Building backend Docker image in Minikube's Docker..."
 docker build -t $BACKEND_IMAGE ./backend
 
-
 echo "Building frontend Docker image in Minikube's Docker..."
 docker build -t $FRONTEND_IMAGE ./frontend
-
-
 
 # Deploy Postgres PVC, Secret, and Deployment
 kubectl apply -f k8s/postgres-pvc.yaml

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import UploadDialog from './UploadDialog';
 
 
 // Backend returns a flat app version object with name and bundle_id
@@ -29,7 +30,6 @@ const AppTable: React.FC<AppTableProps> = ({ token }) => {
   const [sortOrder, setSortOrder] = useState<'asc'|'desc'>('desc');
   const [filter, setFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [uploadSuccess, setUploadSuccess] = useState('');
 
@@ -78,13 +78,11 @@ const AppTable: React.FC<AppTableProps> = ({ token }) => {
     }
   };
 
-  const handleFileUpload = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setUploading(true);
+  const handleApkUpload = async (file: File) => {
     setUploadError('');
     setUploadSuccess('');
-    const form = e.currentTarget;
-    const formData = new FormData(form);
+    const formData = new FormData();
+    formData.append('file', file);
     try {
       const res = await fetch('/api/apps/upload', {
         method: 'POST',
@@ -103,8 +101,7 @@ const AppTable: React.FC<AppTableProps> = ({ token }) => {
         }
         throw new Error(errorMsg);
       }
-      setUploadSuccess('File uploaded successfully!');
-      form.reset();
+      setUploadSuccess('APK uploaded successfully!');
       setShowModal(false);
       // Refresh app list
       fetch('/api/apps', {
@@ -114,8 +111,6 @@ const AppTable: React.FC<AppTableProps> = ({ token }) => {
         .then(data => setApps(data));
     } catch (err: any) {
       setUploadError(err.message || 'Upload failed');
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -131,56 +126,15 @@ const AppTable: React.FC<AppTableProps> = ({ token }) => {
       {showModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(30,30,30,0.7)', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: '#fff', color: '#222', padding: 32, borderRadius: 12, boxShadow: '0 2px 24px rgba(0,0,0,0.3)', minWidth: 400, maxWidth: 480 }}>
-            <h3 style={{ marginTop: 0, marginBottom: 16, color: '#222' }}>Upload App File</h3>
-            <form onSubmit={handleFileUpload}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-                <label style={{ flex: '1 1 180px', color: '#222' }}>
-                  App Name:
-                  <input name="name" required style={{ marginRight: 8, width: '100%' }} />
-                </label>
-                <label style={{ flex: '1 1 180px', color: '#222' }}>
-                  Bundle ID:
-                  <input name="bundle_id" required style={{ marginRight: 8, width: '100%' }} />
-                </label>
-                <label style={{ flex: '1 1 120px', color: '#222' }}>
-                  Platform:
-                  <select name="platform" required style={{ marginRight: 8, width: '100%' }}>
-                    <option value="ios">iOS</option>
-                    <option value="android">Android</option>
-                  </select>
-                </label>
-                <label style={{ flex: '1 1 120px', color: '#222' }}>
-                  Version Name:
-                  <input name="version_name" required style={{ marginRight: 8, width: '100%' }} />
-                </label>
-                <label style={{ flex: '1 1 120px', color: '#222' }}>
-                  Version Code:
-                  <input name="version_code" style={{ marginRight: 8, width: '100%' }} />
-                </label>
-                <label style={{ flex: '1 1 120px', color: '#222' }}>
-                  Folder:
-                  <input name="folder" style={{ marginRight: 8, width: '100%' }} />
-                </label>
-                <label style={{ flex: '1 1 180px', color: '#222' }}>
-                  Metadata (JSON):
-                  <input name="metadata" style={{ marginRight: 8, width: '100%' }} />
-                </label>
-                <label style={{ flex: '1 1 180px', color: '#222' }}>
-                  File:
-                  <input name="file" type="file" required style={{ marginRight: 8, width: '100%' }} />
-                </label>
-              </div>
-              <div style={{ marginTop: 20, display: 'flex', alignItems: 'center' }}>
-                <button type="submit" disabled={uploading} style={{ marginRight: 12 }}>
-                  {uploading ? 'Uploading...' : 'Upload'}
-                </button>
-                <button type="button" onClick={() => setShowModal(false)} style={{ marginRight: 12 }}>
-                  Cancel
-                </button>
-                {uploadError && <span style={{ color: 'red', marginLeft: 8 }}>{uploadError}</span>}
-                {uploadSuccess && <span style={{ color: 'green', marginLeft: 8 }}>{uploadSuccess}</span>}
-              </div>
-            </form>
+            <h3 style={{ marginTop: 0, marginBottom: 16, color: '#222' }}>Upload APK File</h3>
+            <UploadDialog onUpload={handleApkUpload} />
+            <div style={{ marginTop: 20, display: 'flex', alignItems: 'center' }}>
+              <button type="button" onClick={() => setShowModal(false)} style={{ marginRight: 12 }}>
+                Cancel
+              </button>
+              {uploadError && <span style={{ color: 'red', marginLeft: 8 }}>{uploadError}</span>}
+              {uploadSuccess && <span style={{ color: 'green', marginLeft: 8 }}>{uploadSuccess}</span>}
+            </div>
           </div>
         </div>
       )}

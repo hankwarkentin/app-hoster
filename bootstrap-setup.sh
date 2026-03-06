@@ -9,25 +9,26 @@ if [ -z "$KEY" ] || [ -z "$NAME" ]; then
   exit 1
 fi
 POD=$(kubectl get pods -l app=postgres -o jsonpath='{.items[0].metadata.name}')
-# Insert superadmin customer and API key (UUID)
-SQL="DO \$\$ 
+HASH=$(node ./scripts/create-bcrypt-hash.js "$KEY")
+# Insert superadmin customer and API key (UUID) with bcrypt hash
+SQL="DO \$\$
 DECLARE
   cid UUID;
 BEGIN
-  INSERT INTO customers (name, email, role) VALUES ('$NAME', '$NAME@example.com', 'superadmin') ON CONFLICT (email) DO NOTHING;
+  INSERT INTO customers (name, email, role) VALUES ('$NAME', 'bootstrap@example.com', 'superadmin') ON CONFLICT (email) DO NOTHING;
   SELECT id INTO cid FROM customers WHERE name = '$NAME';
-  INSERT INTO api_keys (customer_id, key_hash, revoked) VALUES (cid, crypt('$KEY', gen_salt('bf')), FALSE);
+  INSERT INTO api_keys (customer_id, key_hash, revoked) VALUES (cid, '$HASH', FALSE);
 END\$\$ LANGUAGE plpgsql;"
 echo "$SQL" | kubectl exec -i "$POD" -- bash -c "PGPASSWORD=postgres psql -U postgres -d apphoster"
 echo "Superadmin user '$NAME' and API key '$KEY' added for testing."
 # Insert test user for bootstrap customer using bcrypt hash
-USER_EMAIL="$NAME.user@example.com"
+USER_EMAIL="bootstrap.user@example.com"
 USER_PASSWORD="testpassword"
 USER_NAME="Bootstrap User"
 USER_ROLE="admin"
 echo "Adding test user '$USER_EMAIL' with bcrypt password hash..."
 USER_BCRYPT_HASH='$2b$10$PPkJqDpvMZa5h37nSy5D/unNbbC/WL1OHUHEbUoJHnRLl9ntMDN0C'
-USER_SQL="DO \$\$ 
+USER_SQL="DO \$\$
 DECLARE
   cid UUID;
 BEGIN

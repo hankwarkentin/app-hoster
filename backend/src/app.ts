@@ -3,6 +3,8 @@ import type { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import pool from './db.js';
 import { apiKeyOrJwtAuth } from './auth.js';
+console.log('apiKeyOrJwtAuth type:', typeof apiKeyOrJwtAuth);
+console.log('apiKeyOrJwtAuth value:', apiKeyOrJwtAuth);
 import apiRouter from './api.js';
 import authLoginRouter from './auth-login.js';
 import { createCustomer } from './customer.js';
@@ -18,7 +20,8 @@ logger.info({ event: 'startup', version: APP_VERSION }, 'AppHoster started');
 const app = express();
 import cors from 'cors';
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '1gb' }));
+app.use(express.urlencoded({ limit: '1gb', extended: true }));
 
 // Public health check endpoint
 app.get('/health', (req: Request, res: Response) => {
@@ -50,7 +53,12 @@ app.get('/db-test', async (req: Request, res: Response) => {
 
 // Public login endpoint (no API key required)
 app.use('/api', authLoginRouter);
-app.use('/api', apiKeyOrJwtAuth, apiRouter);
+// Public health check endpoint (must be before auth middleware)
+app.use('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: Date.now() });
+});
+app.use('/api', apiKeyOrJwtAuth);
+app.use('/api', apiRouter);
 
 app.post('/create-test-customer', async (req: Request, res: Response) => {
   const name = req.body.name || 'Test User';

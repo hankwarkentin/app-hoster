@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import crypto from 'crypto';
 import request from 'supertest';
 import express from 'express';
 import fs from 'fs';
@@ -7,66 +8,47 @@ import pool from '../src/db.js';
 import { hashSync } from 'bcryptjs';
 import { apiKeyOrJwtAuth } from '../src/auth.js';
 import apiRouter from '../src/api.js';
-
-// Only import the router for health check test to avoid circular dependency
-let app: express.Express;
-
-beforeAll(async () => {
-  // Ensure a valid API key exists for tests
-  await pool.query('TRUNCATE api_keys, customers CASCADE');
-  const email = 'bootstrap@example.com';
-  const name = 'bootstrap';
-  const role = 'admin';
-  let result = await pool.query('SELECT * FROM customers WHERE email = $1', [email]);
-  let customerId;
-  if (result.rowCount === 0) {
-    result = await pool.query(
-      'INSERT INTO customers (name, email, role) VALUES ($1, $2, $3) RETURNING id',
-      [name, email, role]
-    );
-    customerId = result.rows[0].id;
-  } else {
-    customerId = result.rows[0].id;
-  }
-  const keyHash = hashSync(API_KEY, 10);
-  await pool.query(
-    'INSERT INTO api_keys (customer_id, key_hash) VALUES ($1::uuid, $2)',
-    [customerId, keyHash]
-  );
-  app = express();
-  app.use(express.json());
-  // Add public health check route to test app
-  app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: Date.now() });
-  });
-  app.use('/api', apiKeyOrJwtAuth, apiRouter);
-});
+console.log('apiKeyOrJwtAuth type:', typeof apiKeyOrJwtAuth);
+console.log('apiKeyOrJwtAuth value:', apiKeyOrJwtAuth);
+const app = express();
+app.use(express.json());
+app.use('/api', apiKeyOrJwtAuth);
+app.use('/api', apiRouter);
 
 const API_KEY = process.env.TEST_API_KEY || 'test-bootstrap-key';
 const INVALID_API_KEY = 'invalid-key';
-const TEST_FILE = 'test-endpoint.txt';
-const TEST_FILE_CONTENT = 'test file for endpoint testing';
+const TEST_FILE = path.join(process.cwd(), 'Battleship.apk');
+const TEST_FILE_CONTENT = '';
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 
 function cleanupTestFiles() {
-  try { fs.unlinkSync(TEST_FILE); } catch {}
+  // Do not delete the source test APK file
   try { fs.unlinkSync(path.join(UPLOADS_DIR, TEST_FILE)); } catch {}
   try { fs.unlinkSync('downloaded-endpoint.txt'); } catch {}
 }
 
 describe('AppHoster API', () => {
-  it('should return ok for health check', async () => {
-    const res = await request(app).get('/health');
-    expect(res.status).toBe(200);
-    expect(res.body.status).toBe('ok');
-    expect(typeof res.body.timestamp).toBe('number');
-  });
   beforeAll(() => {
     cleanupTestFiles();
-    fs.writeFileSync(TEST_FILE, TEST_FILE_CONTENT);
+    // Ensure the test APK file exists and is not empty
+    if (!fs.existsSync(TEST_FILE)) {
+      throw new Error(`Test APK file not found: ${TEST_FILE}`);
+    }
+    const stats = fs.statSync(TEST_FILE);
+    if (stats.size === 0) {
+      throw new Error(`Test APK file is empty: ${TEST_FILE}`);
+    }
+    // Rely on bootstrap customer and API key created by deploy-minikube.sh
+    // No customer or API key creation here
   });
   afterAll(() => {
     cleanupTestFiles();
+  });
+  it('should return ok for health check', async () => {
+    const res = await request(app).get('/api/health');
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+    expect(typeof res.body.timestamp).toBe('number');
   });
 
   it('should return 401 for missing API key', async () => {
@@ -90,13 +72,6 @@ let versionId: string | undefined;
     const res = await request(app)
       .post('/api/apps/upload')
       .set('x-api-key', API_KEY)
-      .field('name', 'TestApp')
-      .field('bundle_id', 'com.example.testapp')
-      .field('platform', 'ios')
-      .field('version_name', '1.0.0')
-      .field('version_code', '100')
-      .field('metadata', JSON.stringify({ branch: 'main', commit: 'abcdef123456' }))
-      .field('folder', 'main')
       .attach('file', TEST_FILE);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -120,11 +95,13 @@ let versionId: string | undefined;
       .set('x-api-key', API_KEY);
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
+    // Log the response body for debugging
+    console.log('List apps response:', res.body);
     // Should contain the uploaded version
-    const uploadedVersion = res.body.find((v: any) => v.version_name === '1.0.0' && v.file_url.endsWith(TEST_FILE));
+    const uploadedVersion = res.body.find((v: any) => v.version_name === '0.1' && v.file_url === 'Battleship.apk');
     expect(uploadedVersion).toBeTruthy();
     // Save versionId for later tests
-    versionId = uploadedVersion.id;
+    versionId = uploadedVersion?.id;
     expect(typeof versionId).toBe('string');
     if (typeof versionId === 'string') {
       expect(/^[0-9a-fA-F-]{36}$/.test(versionId)).toBe(true);

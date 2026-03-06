@@ -1,3 +1,14 @@
+// APK metadata interface
+interface ApkMeta {
+  packageName: string;
+  versionName: string;
+  versionCode: string | number;
+  appName: string;
+  permissions?: any;
+  sdkVersion?: any;
+  targetSdkVersion?: any;
+  usesFeatures?: any;
+}
 
 
 // All imports at the top
@@ -45,51 +56,104 @@ router.get('/health', (req, res) => {
 // POST /api/apps/upload - Upload app file
 router.post('/apps/upload', uploadWithFilter.single('file'), async (req, res) => {
   try {
-    if (!req.customer) return res.status(401).json({ error: 'Unauthorized' });
-    // Check for Multer fileFilter error
+    logger.info({ headers: req.headers, contentLength: req.headers['content-length'] }, 'Upload request received');
+    if (!req.customer) {
+      logger.warn('Unauthorized upload attempt');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     if ((req as any).fileValidationError === 'Filename too long') {
+      logger.warn('Filename too long');
       return res.status(400).json({ error: 'Filename too long' });
     }
     const file = req.file;
-    // Defensive: check for file and body before destructuring
-    if (!file || !file.originalname) return res.status(400).json({ error: 'No file uploaded' });
-    if (!req.body) return res.status(400).json({ error: 'Missing app or version metadata' });
-    const { name, bundle_id, platform, version_name, version_code, folder, metadata } = req.body;
-    if (!name || !bundle_id || !platform || !version_name) return res.status(400).json({ error: 'Missing app or version metadata' });
-    if (file.originalname.length > 255) return res.status(400).json({ error: 'Filename too long (max 255 characters)'});
+    logger.info({ file }, 'File received for upload');
+    if (!file || !file.originalname) {
+      logger.warn('No file uploaded');
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    if (file.originalname.length > 255) {
+      logger.warn('Filename too long');
+      return res.status(400).json({ error: 'Filename too long (max 255 characters)'});
+    }
+
+    // Only accept APK files
+    if (!file.originalname.endsWith('.apk')) {
+      logger.warn('Non-APK file upload attempted');
+      return res.status(400).json({ error: 'Only APK files are supported' });
+    }
+
+    // Log file size
+    logger.info({ size: file.size, path: file.path }, 'APK file size and path');
+
+    logger.info('--- Begin APK upload flow ---');
+    // Parse APK metadata
+    let apkMeta: ApkMeta;
+    try {
+      logger.info({ path: file.path }, 'Parsing APK metadata');
+      const nodeApkParser = await import('node-apk-parser');
+      logger.info('node-apk-parser imported');
+      const ApkReader = nodeApkParser.default || nodeApkParser;
+      logger.info('ApkReader loaded');
+      const reader = ApkReader.readFile(file.path);
+      logger.info('ApkReader.readFile complete');
+      const manifest = reader.readManifestSync();
+      logger.info('readManifestSync complete');
+      apkMeta = {
+        packageName: manifest.package,
+        versionName: manifest.versionName,
+        versionCode: manifest.versionCode,
+        appName: manifest.application.label,
+        permissions: manifest.permissions,
+        sdkVersion: manifest.sdkVersion,
+        targetSdkVersion: manifest.targetSdkVersion,
+        usesFeatures: manifest.usesFeatures,
+      };
+      logger.info({ apkMeta }, 'APK metadata parsed');
+    } catch (err) {
+      logger.error({ err }, 'APK parsing failed');
+      return res.status(400).json({ error: 'Failed to parse APK metadata' });
+    }
+
+    logger.info('--- APK metadata parsed, proceeding to S3 upload ---');
     // Upload to S3
     const s3Key = file.originalname;
-    await uploadFileToS3(s3Key, file.path);
+    logger.info({ s3Key, filePath: file.path }, 'Uploading APK to S3');
+    try {
+      await uploadFileToS3(s3Key, file.path);
+      logger.info({ s3Key }, 'APK uploaded to S3');
+    } catch (err) {
+      logger.error({ err }, 'S3 upload failed');
+      return res.status(500).json({ error: 'Failed to upload APK to S3', details: err instanceof Error ? err.message : String(err) });
+    }
+
+    logger.info('--- S3 upload complete, proceeding to DB ---');
     // Find or create app
     let appResult = await pool.query(
-      'SELECT * FROM apps WHERE customer_id = $1::uuid AND name = $2 AND bundle_id = $3',
-      [req.customer.id, name, bundle_id]
+      'SELECT * FROM apps WHERE customer_id = $1::uuid AND bundle_id = $2',
+      [req.customer.id, apkMeta.packageName]
     );
     let appId;
     if (appResult.rowCount === 0) {
+      logger.info({ appName: apkMeta.appName, bundleId: apkMeta.packageName }, 'Creating new app record');
       appResult = await pool.query(
         'INSERT INTO apps (customer_id, name, bundle_id) VALUES ($1::uuid, $2, $3) RETURNING id',
-        [req.customer.id, name, bundle_id]
+        [req.customer.id, apkMeta.appName || apkMeta.packageName, apkMeta.packageName]
       );
       appId = appResult.rows[0].id;
+      logger.info({ appId }, 'New app record created');
     } else {
       appId = appResult.rows[0].id;
+      logger.info({ appId }, 'Existing app record found');
     }
-    // Parse metadata if provided as string
-    let metadataObj = null;
-    if (metadata) {
-      try {
-        metadataObj = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
-      } catch {
-        return res.status(400).json({ error: 'Invalid metadata JSON' });
-      }
-    }
+
     // Insert version
+    logger.info({ appId, versionName: apkMeta.versionName, versionCode: apkMeta.versionCode }, 'Inserting app version record');
     const versionResult = await pool.query(
       'INSERT INTO app_versions (app_id, platform, version_name, version_code, folder, file_url, metadata) VALUES ($1::uuid, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [appId, platform, version_name, version_code || null, folder || null, s3Key, metadataObj]
+      [appId, 'android', apkMeta.versionName, apkMeta.versionCode, null, s3Key, apkMeta]
     );
-    res.json({ success: true, app: { id: appId, name, bundle_id }, version: versionResult.rows[0] });
+    logger.info({ version: versionResult.rows[0] }, 'App version record inserted');
+    res.json({ success: true, app: { id: appId, name: apkMeta.appName || apkMeta.packageName, bundle_id: apkMeta.packageName }, version: versionResult.rows[0] });
   } catch (err) {
     logger.error({ err }, 'Upload error');
     res.status(500).json({ error: 'Internal server error' });
