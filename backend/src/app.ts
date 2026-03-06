@@ -10,6 +10,7 @@ import authLoginRouter from './auth-login.js';
 import { createCustomer } from './customer.js';
 import logger from './logger.js';
 import pkg from '../package.json' with { type: 'json' };
+import cookieParser from 'cookie-parser';
 
 dotenv.config();
 
@@ -19,7 +20,8 @@ logger.info({ event: 'startup', version: APP_VERSION }, 'AppHoster started');
 
 const app = express();
 import cors from 'cors';
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
+app.use(cookieParser());
 app.use(express.json({ limit: '1gb' }));
 app.use(express.urlencoded({ limit: '1gb', extended: true }));
 

@@ -149,6 +149,7 @@ const AppTable: React.FC<AppTableProps> = ({ token }) => {
         <table className="apphoster-table">
           <thead>
             <tr>
+              <th></th>
               <th onClick={() => handleSort('name')}>Name</th>
               <th>Bundle ID</th>
               <th onClick={() => handleSort('uploaded_at')}>Latest Upload</th>
@@ -156,10 +157,13 @@ const AppTable: React.FC<AppTableProps> = ({ token }) => {
             </tr>
           </thead>
           <tbody>
-            {sortedApps.map((app, idx) => {
+              {sortedApps.map((app, idx) => {
               const latestVersion = versions.filter(v => v.app_id === app.app_id).sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at))[0];
               return (
                 <tr key={app.app_id} className={idx % 2 === 0 ? 'even' : 'odd'}>
+                  <td style={{ width: 64 }}>
+                    <img src={`/api/apps/${app.app_id}/icon`} alt="icon" style={{ width: 48, height: 48, objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  </td>
                   <td>{app.name}</td>
                   <td>{app.bundle_id}</td>
                   <td>{latestVersion ? new Date(latestVersion.uploaded_at).toLocaleString() : '-'}</td>

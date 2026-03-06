@@ -115,6 +115,26 @@ router.post('/apps/upload', uploadWithFilter.single('file'), async (req, res) =>
     }
 
     logger.info('--- APK metadata parsed, proceeding to S3 upload ---');
+    // Try to extract application icon from APK
+    let iconTempPath: string | undefined;
+    try {
+      const unzipper = await import('unzipper');
+      const open = await (unzipper as any).Open.file(file.path);
+      // Candidate patterns for launcher icons
+      const candidates = open.files.filter((f: any) => /res\/(mipmap|drawable)/.test(f.path) && /ic[_-]?launcher|ic_app|icon/i.test(f.path) && /\.(png|jpg|jpeg)$/i.test(f.path));
+      const allPngs = open.files.filter((f: any) => /res\//.test(f.path) && /\.(png|jpg|jpeg)$/i.test(f.path));
+      const pick = (candidates.length > 0 ? candidates : allPngs).sort((a: any, b: any) => (b.uncompressedSize || 0) - (a.uncompressedSize || 0))[0];
+      if (pick) {
+        const buf = await pick.buffer();
+        const os = await import('os');
+        const pathMod = await import('path');
+        iconTempPath = pathMod.join(os.tmpdir(), `apphoster-icon-${Date.now()}.png`);
+        await import('fs').then(fs => fs.promises.writeFile(iconTempPath as string, buf));
+        logger.info({ icon: pick.path, size: buf.length }, 'Extracted icon from APK');
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Icon extraction failed — continuing without icon');
+    }
     // Upload to S3
     const s3Key = file.originalname;
     logger.info({ s3Key, filePath: file.path }, 'Uploading APK to S3');
@@ -144,6 +164,18 @@ router.post('/apps/upload', uploadWithFilter.single('file'), async (req, res) =>
     } else {
       appId = appResult.rows[0].id;
       logger.info({ appId }, 'Existing app record found');
+    }
+
+    // If we extracted an icon, upload it and save icon_url on the app
+    if (iconTempPath) {
+      try {
+        const iconKey = `icons/${appId}.png`;
+        await (await import('./s3.js')).uploadIconToS3(iconKey, iconTempPath);
+        await pool.query('UPDATE apps SET icon_url = $1 WHERE id = $2::uuid', [iconKey, appId]);
+        logger.info({ iconKey, appId }, 'Uploaded icon and updated app record');
+      } catch (err) {
+        logger.error({ err }, 'Failed to upload icon or update DB');
+      }
     }
 
     // Insert version
@@ -247,3 +279,28 @@ router.delete('/apps/:id', async (req, res) => {
 
 // Export router after all endpoints are defined
 export default router;
+
+// Serve app icon
+router.get('/apps/:id/icon', async (req, res) => {
+  try {
+    const appId = req.params.id;
+    // Require authentication and ensure the app belongs to the requesting customer
+    if (!req.customer) return res.status(401).json({ error: 'Unauthorized' });
+    const r = await pool.query('SELECT icon_url FROM apps WHERE id = $1::uuid AND customer_id = $2::uuid', [appId, req.customer.id]);
+    if (r.rowCount === 0 || !r.rows[0].icon_url) return res.status(404).json({ error: 'Icon not found' });
+    const key = r.rows[0].icon_url;
+    const s3Obj = await (await import('./s3.js')).getFileFromS3(key, (await import('./s3.js')).iconBucketName);
+    if (s3Obj.Body && typeof (s3Obj.Body as any).pipe === 'function') {
+      res.setHeader('Content-Type', 'image/png');
+      (s3Obj.Body as any).pipe(res);
+    } else if (s3Obj.Body && Buffer.isBuffer(s3Obj.Body)) {
+      res.setHeader('Content-Type', 'image/png');
+      res.end(s3Obj.Body);
+    } else {
+      res.status(404).json({ error: 'Icon not found' });
+    }
+  } catch (err) {
+    logger.error({ err }, 'Icon download failed');
+    res.status(500).json({ error: 'Icon download failed' });
+  }
+});

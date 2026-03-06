@@ -12,17 +12,20 @@ export function apiKeyOrJwtAuth(req: Request, res: Response, next: NextFunction)
     if (req.method === 'GET' && (req.path === '/health' || req.originalUrl === '/api/health')) {
       return next();
     }
-    // Try JWT first
+    // Try JWT first (Authorization header or cookie)
     const authHeader = req.headers['authorization'];
+    const cookieToken = (req as any).cookies ? (req as any).cookies.token : undefined;
+    let token: string | undefined;
     if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.slice(7);
+      token = authHeader.slice(7);
+    } else if (cookieToken) {
+      token = cookieToken;
+    }
+    if (token) {
       try {
         const secret = process.env.JWT_SECRET || 'dev-secret';
         const payload = verify(token, secret);
-        // Attach user info from JWT
         (req as any).user = payload;
-        // Optionally, fetch customer from DB if needed
-        // Handle JWT payload type
         const customerId = typeof payload === 'string' ? undefined : (payload as any).customerId;
         if (!customerId) {
           logger.error({ event: 'auth', token }, 'JWT payload missing customerId');

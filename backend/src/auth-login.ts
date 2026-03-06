@@ -51,6 +51,14 @@ router.post('/login', async (req, res) => {
     // Optionally update last_login timestamp
     await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
 
+    // Set HttpOnly cookie so browser image requests include the JWT automatically
+    res.cookie('token', token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 2 * 60 * 60 * 1000 // 2 hours
+    });
+
     res.json({ token });
   } catch (err) {
     logger.error({ err }, 'User login error');
