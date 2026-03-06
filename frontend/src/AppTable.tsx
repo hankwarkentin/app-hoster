@@ -108,7 +108,16 @@ const AppTable: React.FC<AppTableProps> = ({ token }) => {
         headers: { 'Authorization': `Bearer ${token}` }
       })
         .then(res => res.json())
-        .then(data => setApps(data));
+        .then(data => {
+          // Update versions and recompute unique apps so latest upload column is correct
+          setVersions(data);
+          const uniqueApps = Array.from(
+            new Map(
+              data.map((v: AppVersionRow) => [v.app_id, { bundle_id: v.bundle_id, app_id: v.app_id }])
+            ).values()
+          ) as { bundle_id: string; app_id: string }[];
+          setApps(uniqueApps);
+        });
     } catch (err: any) {
       setUploadError(err.message || 'Upload failed');
     }
