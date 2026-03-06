@@ -62,9 +62,10 @@ export function apiKeyOrJwtAuth(req: Request, res: Response, next: NextFunction)
       }
     }
     if (!customerId) {
-      // Fallback for test environment: allow TEST_API_KEY to map to bootstrap customer
-      if (process.env.NODE_ENV === 'test' && apiKey === (process.env.TEST_API_KEY || 'test-bootstrap-key')) {
-        const cust = await pool.query("SELECT * FROM customers WHERE name = 'bootstrap' ORDER BY created_at LIMIT 1");
+      // Fallback for test environment: allow TEST_API_KEY to map to a test customer
+      if (process.env.NODE_ENV === 'test' && apiKey === (process.env.TEST_API_KEY || 'test-api-key')) {
+        const testCustomerName = process.env.TEST_CUSTOMER_NAME || 'test-customer';
+        const cust = await pool.query('SELECT * FROM customers WHERE name = $1 ORDER BY created_at LIMIT 1', [testCustomerName]);
         if (cust && (cust.rowCount ?? 0) > 0) {
           (req as any).customer = cust.rows[0];
           return next();

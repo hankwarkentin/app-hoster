@@ -5,14 +5,15 @@ import pool from '../src/db.js';
 import crypto from 'crypto';
 import { hashSync } from 'bcryptjs';
 
-const API_KEY = process.env.TEST_API_KEY || 'test-bootstrap-key';
+const API_KEY = process.env.TEST_API_KEY || 'test-api-key';
 
 beforeAll(async () => {
-  // Clean up tables before tests
-  await pool.query('TRUNCATE api_keys, customers CASCADE');
-  // Ensure bootstrap customer exists
-  const email = `bootstrap+${Date.now()}@example.com`;
-  const name = 'bootstrap';
+  // Clean up any previous test customers (avoid wiping all data)
+  await pool.query("DELETE FROM api_keys WHERE customer_id IN (SELECT id FROM customers WHERE email LIKE 'test-customer+%')");
+  await pool.query("DELETE FROM customers WHERE email LIKE 'test-customer+%'");
+  // Ensure test customer exists
+  const email = `test-customer+${Date.now()}@example.com`;
+  const name = 'test-customer';
   const role = 'admin';
   let result = await pool.query('SELECT * FROM customers WHERE email = $1', [email]);
   let customerId;
@@ -25,7 +26,7 @@ beforeAll(async () => {
   } else {
     customerId = result.rows[0].id;
   }
-  // Ensure bootstrap API key exists in api_keys table
+  // Ensure test API key exists in api_keys table
   const keyHash = hashSync(API_KEY, 10);
   await pool.query(
     'INSERT INTO api_keys (customer_id, key_hash) VALUES ($1::uuid, $2)',

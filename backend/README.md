@@ -20,13 +20,13 @@ A Node.js + TypeScript API for hosting and distributing IPA, AAB, and APK files 
 ### Kubernetes/Minikube Deployment
 1. Start Minikube: `minikube start`
 2. Deploy with DB reset: `bash deploy-minikube.sh --reset`
-   - This wipes the database, applies the schema, and inserts a bootstrap API key
+  - This wipes the database, applies the schema, and inserts an initial API key
 3. Port-forward API: `kubectl port-forward svc/apphoster-service 8000:3000`
-4. Test endpoints using the bootstrap API key (see below)
+4. Test endpoints using the initial API key (see below)
 
 ## API Key Authentication
 - All /api endpoints require an API key in the `x-api-key` header
-- The bootstrap key is set during deployment (see deploy-minikube.sh)
+-- The initial API key is set during deployment (see deploy-minikube.sh)
 
 ## API Key Management Endpoints
 
@@ -69,16 +69,16 @@ curl -X POST -H "x-api-key: <admin-key>" http://localhost:8000/api/keys/2/revoke
 ## Example Usage
 ```bash
 # List apps
-curl -H "x-api-key: <bootstrap-key>" http://localhost:8000/api/apps
+curl -H "x-api-key: <API_KEY>" http://localhost:8000/api/apps
 
 # Upload a file
-curl -X POST -H "x-api-key: <bootstrap-key>" -F "file=@yourfile.txt" http://localhost:8000/api/apps/upload
+curl -X POST -H "x-api-key: <API_KEY>" -F "file=@yourfile.txt" http://localhost:8000/api/apps/upload
 
 # Download a file
-curl -H "x-api-key: <bootstrap-key>" http://localhost:8000/api/apps/1/download -o ~/Downloads/yourfile.txt
+curl -H "x-api-key: <API_KEY>" http://localhost:8000/api/apps/1/download -o ~/Downloads/yourfile.txt
 
 # Delete a file
-curl -X DELETE -H "x-api-key: <bootstrap-key>" http://localhost:8000/api/apps/1
+curl -X DELETE -H "x-api-key: <API_KEY>" http://localhost:8000/api/apps/1
 ```
 
 ## Notes

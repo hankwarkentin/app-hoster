@@ -2,11 +2,11 @@
 import { hashSync } from 'bcryptjs';
 import pool from '../src/db.js';
 
-const email = process.argv[2] || 'bootstrap.user@example.com';
+const email = process.argv[2] || 'test-customer.user@example.com';
 const password = process.argv[3] || 'testpassword';
-const name = process.argv[4] || 'Bootstrap User';
+const name = process.argv[4] || 'Test Customer User';
 const role = process.argv[5] || 'admin';
-const customerName = process.argv[6] || 'bootstrap';
+const customerName = process.argv[6] || 'test-customer';
 
 async function main() {
   // Find customer

@@ -15,7 +15,7 @@ app.use(express.json());
 app.use('/api', apiKeyOrJwtAuth);
 app.use('/api', apiRouter);
 
-const API_KEY = process.env.TEST_API_KEY || 'test-bootstrap-key';
+const API_KEY = process.env.TEST_API_KEY || 'test-api-key';
 const INVALID_API_KEY = 'invalid-key';
 const TEST_FILE = path.join(process.cwd(), 'Battleship.apk');
 const TEST_FILE_CONTENT = '';
@@ -38,7 +38,7 @@ describe('AppHoster API', () => {
     if (stats.size === 0) {
       throw new Error(`Test APK file is empty: ${TEST_FILE}`);
     }
-    // Rely on bootstrap customer and API key created by deploy-minikube.sh
+    // Rely on test customer and API key created by deploy-minikube.sh
     // No customer or API key creation here
   });
   afterAll(() => {

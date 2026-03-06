@@ -57,9 +57,9 @@ if [[ "$1" == "--reset" ]]; then
   POSTGRES_POD=$(kubectl get pods -l app=postgres -o jsonpath='{.items[0].metadata.name}')
   kubectl cp db/schema.sql "$POSTGRES_POD":/tmp/schema.sql
   kubectl exec "$POSTGRES_POD" -- bash -c "PGPASSWORD=postgres psql -U postgres -d apphoster -f /tmp/schema.sql"
-  BOOTSTRAP_KEY="test-bootstrap-key"
-  BOOTSTRAP_NAME="bootstrap"
-  echo "Adding bootstrap API key and test user to database..."
+  BOOTSTRAP_KEY="test-api-key"
+  BOOTSTRAP_NAME="test-customer"
+  echo "Adding initial API key and test user to database..."
   ./bootstrap-setup.sh "$BOOTSTRAP_KEY" "$BOOTSTRAP_NAME"
 fi
 
