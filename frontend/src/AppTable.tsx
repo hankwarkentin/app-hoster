@@ -24,9 +24,9 @@ interface AppTableProps {
 
 const AppTable: React.FC<AppTableProps> = ({ token }) => {
   const [versions, setVersions] = useState<AppVersionRow[]>([]);
-  const [apps, setApps] = useState<{ name: string; bundle_id: string; app_id: string }[]>([]);
+  const [apps, setApps] = useState<{ bundle_id: string; app_id: string }[]>([]);
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
-  const [sortKey, setSortKey] = useState<'name'|'platform'|'uploaded_at'>('uploaded_at');
+  const [sortKey, setSortKey] = useState<'bundle_id'|'platform'|'uploaded_at'>('uploaded_at');
   const [sortOrder, setSortOrder] = useState<'asc'|'desc'>('desc');
   const [filter, setFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -45,18 +45,18 @@ const AppTable: React.FC<AppTableProps> = ({ token }) => {
         // Extract unique apps for the user/customer
         const uniqueApps = Array.from(
           new Map(
-            data.map((v: AppVersionRow) => [v.app_id, { name: v.name, bundle_id: v.bundle_id, app_id: v.app_id }])
+            data.map((v: AppVersionRow) => [v.app_id, { bundle_id: v.bundle_id, app_id: v.app_id }])
           ).values()
-        ) as { name: string; bundle_id: string; app_id: string }[];
+        ) as { bundle_id: string; app_id: string }[];
         setApps(uniqueApps);
       });
   }, [token]);
 
   // Filter and sort apps list
-  const filteredApps = apps.filter(app => app.name.toLowerCase().includes(filter.toLowerCase()));
+  const filteredApps = apps.filter(app => app.bundle_id.toLowerCase().includes(filter.toLowerCase()));
   const sortedApps = [...filteredApps].sort((a, b) => {
-    let aVal = a.name, bVal = b.name;
-    if (sortKey === 'name') {
+    let aVal = a.bundle_id, bVal = b.bundle_id;
+    if (sortKey === 'bundle_id') {
       // already set
     } else if (sortKey === 'uploaded_at') {
       // Sort by most recent version upload for each app
@@ -69,7 +69,7 @@ const AppTable: React.FC<AppTableProps> = ({ token }) => {
     else return bVal.localeCompare(aVal);
   });
 
-  const handleSort = (key: 'name'|'platform'|'uploaded_at') => {
+  const handleSort = (key: 'bundle_id'|'platform'|'uploaded_at') => {
     if (sortKey === key) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
@@ -140,7 +140,7 @@ const AppTable: React.FC<AppTableProps> = ({ token }) => {
       )}
       <input
         type="text"
-        placeholder="Filter by name..."
+        placeholder="Filter by bundle id..."
         value={filter}
         onChange={e => setFilter(e.target.value)}
         style={{ marginBottom: 12 }}
@@ -150,7 +150,6 @@ const AppTable: React.FC<AppTableProps> = ({ token }) => {
           <thead>
             <tr>
               <th></th>
-              <th onClick={() => handleSort('name')}>Name</th>
               <th>Bundle ID</th>
               <th onClick={() => handleSort('uploaded_at')}>Latest Upload</th>
               <th>Actions</th>
@@ -164,8 +163,7 @@ const AppTable: React.FC<AppTableProps> = ({ token }) => {
                   <td style={{ width: 64 }}>
                     <img src={`/api/apps/${app.app_id}/icon`} alt="icon" style={{ width: 48, height: 48, objectFit: 'contain' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                   </td>
-                  <td>{app.name}</td>
-                  <td>{app.bundle_id}</td>
+                  <td style={{ fontFamily: 'monospace' }}>{app.bundle_id}</td>
                   <td>{latestVersion ? new Date(latestVersion.uploaded_at).toLocaleString() : '-'}</td>
                   <td>
                     <button className="view-btn" onClick={() => setSelectedAppId(app.app_id)}>View Versions</button>
@@ -178,7 +176,7 @@ const AppTable: React.FC<AppTableProps> = ({ token }) => {
       ) : (
         <div>
           <button className="back-btn" onClick={() => setSelectedAppId(null)} style={{ marginBottom: 12 }}>Back to Apps</button>
-          <h3>Versions for {apps.find(a => a.app_id === selectedAppId)?.name}</h3>
+          <h3>Versions for {apps.find(a => a.app_id === selectedAppId)?.bundle_id}</h3>
           <table className="apphoster-table">
             <thead>
               <tr>
