@@ -178,11 +178,24 @@ router.post('/apps/upload', uploadWithFilter.single('file'), async (req, res) =>
       }
     }
 
-    // Insert version
+    // Insert version. Use parsed APK fields for version_name/version_code, but
+    // only store `metadata` column if the caller explicitly provided metadata
+    // (e.g. when using the api upload script). Frontend file uploads should
+    // not populate the metadata column.
     logger.info({ appId, versionName: apkMeta.versionName, versionCode: apkMeta.versionCode }, 'Inserting app version record');
+    let suppliedMetadata: any = null;
+    try {
+      if (req.body && (req.body as any).metadata) {
+        const raw = (req.body as any).metadata;
+        suppliedMetadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Failed to parse supplied metadata; ignoring and storing null');
+      suppliedMetadata = null;
+    }
     const versionResult = await pool.query(
       'INSERT INTO app_versions (app_id, platform, version_name, version_code, folder, file_url, metadata) VALUES ($1::uuid, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [appId, 'android', apkMeta.versionName, apkMeta.versionCode, null, s3Key, apkMeta]
+      [appId, 'android', apkMeta.versionName, apkMeta.versionCode, null, s3Key, suppliedMetadata]
     );
     logger.info({ version: versionResult.rows[0] }, 'App version record inserted');
     res.json({ success: true, app: { id: appId, name: apkMeta.appName || apkMeta.packageName, bundle_id: apkMeta.packageName }, version: versionResult.rows[0] });
